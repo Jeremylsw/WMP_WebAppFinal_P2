@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
+    <title>Details</title>
+    <script src="jquery-3.7.0.min.js"></script>
+    <script src="helper_fn.js"></script>
+    <script src="definitions.js"></script>
+    <link rel="manifest" href="manifest.webmanifest">
+    <script>
+
+        $(function () {
+
+
+            /* Check which index of data object is called from previous click */
+            clickedIndex = localStorage['listingClickedIndex'];
+            packageInfo = JSON.parse(localStorage["packages"])[clickedIndex];
+            console.log(JSON.stringify(packageInfo).image);
+
+            /* Load notification data */
+            displayNotifications(packageInfo.name);
+
+            /* Send data to html*/
+            navigator.serviceWorker.addEventListener("message", function (event) {
+                if (checkIfValidPackageName(event.data)) {
+                    console.log('[Note] Saving notification data');
+                    var tempName = event.data.split(':')[0];
+                    var tempNotif = event.data.slice(tempName.length + 1);
+                    if (packageInfo.name == event.data.split(':')[0]) {
+
+                        $("#detailsBodyTableBtm").append(" \
+                         <tr id='tableContentsBtm'><td class='tableBtmText'>" + tempNotif + "</td></tr> \
+                        ")
+
+                    }
+                    storeNotification(event.data.split(':')[0], event.data.slice(event.data.split(':')[0].length + 1))
+                } else {
+                    console.log('[Warning] Invalid notification input. Data discarded');
+                }
+            });
+
+            /* Update GUI to reflect name of package */
+            $("#header-text-left").text(packageInfo.name);
+            $("#tableContents").append("<td>" + packageInfo.theme + "</td>");
+            artisteInfo = packageInfo.artiste;
+            artisteInfo = artisteInfo[0].toUpperCase() + artisteInfo.slice(1);
+            $("#tableContents").append("<td>" + artisteInfo + "</td>");
+            $("#tableContents").append("<td>" + packageInfo.duration + " days </td>");
+            $("#tableContents").append("<td> $" + packageInfo.price + "</td>");
+
+            /* Update package details to body */
+            /* Html created, use jQuery to fill in data*/
+            $("#detailsBodyImg").attr("src", packageInfo.image);
+
+
+            /* Handler to move to map.html when footer clicked */
+            $(".detailsFooter").click(function (evt) {
+                window.location.href = "map.html";
+            })
+
+            $(".header-btn").click(function (evt) {
+                window.location.href = "listing.html";
+            })
+
+            /* Clear button to clear all existing notifications */
+            $(".header-btn-clear").click(function (evt) {
+                /* Clear table */
+                $("#detailsBodyTableBtm").text('');
+                /* Clear localStorage */
+                localStorage[packageInfo.name + ' notifications'] = JSON.stringify([]);
+            })
+
+        });
+
+
+
+    </script>
+
+    <style>
+        /*
+        * Generic CSS
+        */
+        header,
+        body,
+        footer {
+            padding: 0px;
+            margin: 0px;
+        }
+
+
+        /*
+        * Header CSS
+        */
+        header {
+            height: 5vh;
+            background-color: gray;
+            color: white;
+        }
+
+        button {
+            left: 2vw;
+        }
+
+        .header-btn {
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            float: left;
+            position: relative;
+            top: 20%;
+        }
+
+        .header-btn-clear {
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            float: left;
+            position: relative;
+            left: 3%;
+            top: 20%;
+        }
+
+        .header-text {
+            position: relative;
+            top: 1.25vh;
+            left: 5vw;
+        }
+
+        #header-text-left {
+            float: left;
+            left: 5%;
+        }
+
+        /*
+        * Body CSS
+        */
+        .detailsBodyTop,
+        #detailsBodyImg {
+            height: 40vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .detailsBodyMiddle {
+            height: 10vh;
+            text-align: center;
+        }
+
+        .detailsBodyBtm {
+            min-height: 37vh;
+            margin-bottom: 3vh;
+            overflow: auto;
+        }
+
+        #detailsBodyTable {
+            width: 90vw;
+            position: relative;
+            top: 3vh;
+            margin: 0 auto;
+        }
+
+        #tableHeader {
+            width: 50vw;
+            color: darkgray;
+        }
+
+        #tableContents {
+            font-size: 80%;
+            font-weight: bold;
+        }
+
+        #BtmHeader {
+            text-align: center;
+            margin-top: 5vh;
+            color: rgb(111, 106, 106);
+            font-weight: bold;
+        }
+
+        .tableBtmText {
+            text-align: center;
+            border: 1px solid black;
+        }
+
+        #detailsBodyTableBtm {
+            border-collapse: collapse;
+            min-width: 80vw;
+            margin: 1vh auto;
+        }
+
+        /*
+        * Footer CSS
+        */
+        footer {
+            height: 5vh;
+            background-color: rgb(72, 72, 72);
+            color: white;
+            text-align: center;
+        }
+
+        #detailsFooterText {
+            position: relative;
+            top: 1.25vh;
+            font-size: 80%;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <header>
+        <button class="header-btn"> Back </button>
+        <button class="header-btn-clear"> Clear </button>
+        <div class="header-text" , id="header-text-left"> </div>
+    </header>
+    <div class='detailsBodyTop'>
+        <img id="detailsBodyImg" src="" alt="Img">
+    </div>
+    <div class='detailsBodyMiddle'>
+        <table id='detailsBodyTable'>
+            <tr id="tableHeader">
+                <td>Theme</td>
+                <td>Artiste Included</td>
+                <td>Duration</td>
+                <td>Price</td>
+            </tr>
+            <tr id="tableContents"></tr>
+        </table>
+    </div>
+    <div class='detailsBodyBtm'>
+
+        <div id='BtmHeader'> Notifications </div>
+        <table id='detailsBodyTableBtm'>
+            <!-- Sample Data entry -->
+            <!-- <tr id="tableContentsBtm">
+                <td class="tableBtmText">test</td>
+            </tr> -->
+
+        </table>
+    </div>
+    <footer class='detailsFooter'>
+        <div class='detailsFooter' id='detailsFooterText'>
+            INDICATE PLACE OF INTEREST >
+        </div>
+    </footer>
+
+</body>
+
+</html>

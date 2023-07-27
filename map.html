@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
+    <title>Map</title>
+    <script src="jquery-3.7.0.min.js"></script>
+    <script src="helper_fn.js"></script>
+    <script src="definitions.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+    <link rel="manifest" href="manifest.webmanifest">
+    <script>
+
+        /* Check which index of data object is called from previous click */
+        var clickedIndex = localStorage['listingClickedIndex'];
+        var packageInfo = JSON.parse(localStorage["packages"])[clickedIndex];
+        /* Makers list to store markers temporarily for tracking of removal */
+        var mapMarkersList = {};
+
+        $(function () {
+            
+            /* Send data to html*/
+            navigator.serviceWorker.addEventListener("message", function (event) {
+                if (checkIfValidPackageName(event.data)) {
+                    console.log('[Note] Saving notification data');
+                    storeNotification(event.data.split(':')[0], event.data.slice(event.data.split(':')[0].length + 1))
+                } else {
+                    console.log('[Warning] Invalid notification input. Data discarded');
+                }
+            });
+            /* Update GUI to reflect name of package */
+            $("#header-text-left").text(packageInfo.name);
+
+            /* Init Map */
+            var map;
+            mapCoords = JSON.parse(localStorage[packageInfo.name + ' map']);
+            initMap(mapCoords);
+
+            /* Check if map markers stack is already created in localStorage */
+            /* localStorage stores stringified map event as markers are circular structure - cannot be stringified to store */
+            if (!localStorage[packageInfo.name + ' mapMarkers']) {
+                console.log('Creating Markers array')
+                localStorage[packageInfo.name + ' mapMarkers'] = JSON.stringify({});
+            } else { /* Load markers if markers already present */
+                console.log('Loading Markers')
+                markersObj = JSON.parse(localStorage[packageInfo.name + ' mapMarkers']);
+                Object.keys(markersObj).forEach(element => {
+                    loadMapMarker(markersObj[element]);
+                });
+            }
+
+            /* Back button to return to previous page */
+            $(".header-btn").click(function (evt) {
+                window.location.href = "details.html";
+            })
+
+            /* Clear button to clear all existing markers */
+            $(".header-btn-clear").click(function (evt) {
+                /* Clear Map Marker List */
+                Object.keys(mapMarkersList).forEach(element => {
+                    mapMarkersList[element].setMap(null);
+                });
+                mapMarkersList = {};
+                /* Clear localStorage */
+                localStorage[packageInfo.name + ' mapMarkers'] = JSON.stringify({});
+            })
+        });
+
+        function initMap(coordsObj) {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: coordsObj["lat"], lng: coordsObj["lon"] },
+                zoom: 3
+            });
+            /* Click to add marker on map */
+            map.addListener('click', function (event) {
+                addMapMarker(event);
+                /* Add to localStorage */
+                addMapEventToLocal(event);
+            });
+        }
+
+        function addMapMarker(inputEvent) {
+            /* Create marker */
+            var marker = new google.maps.Marker({
+                position: inputEvent.latLng,
+                map: map
+            });
+            /* Add marker to temp Array */
+            mapMarkersList[inputEvent.latLng.lat() + ' ' + inputEvent.latLng.lng()] = marker;
+
+            /* Listener for marker removal on map on click */
+            marker.addListener('click', function (event) {
+                removeMapMarker(event);
+            });
+        }
+
+        function loadMapMarker(inputEvent) {
+            /* Create marker */
+            var marker = new google.maps.Marker({
+                position: inputEvent.latLng,
+                map: map
+            });
+            /* Add marker to temp Array */
+            mapMarkersList[inputEvent.latLng.lat + ' ' + inputEvent.latLng.lng] = marker;
+
+            /* Listener for marker removal on map on click */
+            marker.addListener('click', function (event) {
+                removeMapMarker(event);
+            });
+        }
+
+        function removeMapMarker(inputEvent) {
+            /* Remove from local Storage */
+            removeMapEventFromLocal(inputEvent);
+            /* Remove from markers array*/
+            mapMarkersList[inputEvent.latLng.lat() + ' ' + inputEvent.latLng.lng()].setMap(null);
+            delete mapMarkersList[inputEvent.latLng.lat + ' ' + inputEvent.latLng.lng];
+        }
+
+        /*
+        * @brief Adds an onclick map event into localStorage
+        */
+        function addMapEventToLocal(inputEvent) {
+            tempVar = JSON.parse(localStorage[packageInfo.name + ' mapMarkers']);
+            tempVar[inputEvent.latLng.lat() + ' ' + inputEvent.latLng.lng()] = inputEvent;
+            localStorage[packageInfo.name + ' mapMarkers'] = JSON.stringify(tempVar);
+        }
+
+        /*
+        * @brief Removes an onclick map event from localStorage
+        */
+        function removeMapEventFromLocal(inputEvent) {
+            tempVar = JSON.parse(localStorage[packageInfo.name + ' mapMarkers']);
+            delete tempVar[inputEvent.latLng.lat() + ' ' + inputEvent.latLng.lng()];
+            localStorage[packageInfo.name + ' mapMarkers'] = JSON.stringify(tempVar);
+        }
+    </script>
+
+    <style>
+        /*
+        * Generic CSS
+        */
+        header,
+        body {
+            padding: 0px;
+            margin: 0px;
+        }
+
+
+        /*
+        * Header CSS
+        */
+        header {
+            height: 5vh;
+            background-color: gray;
+            color: white;
+        }
+
+        button {
+            left: 2vw;
+        }
+
+        .header-btn {
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            float: left;
+            position: relative;
+            top: 20%;
+        }
+
+        .header-btn-clear {
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            float: left;
+            position: relative;
+            left: 3%;
+            top: 20%;
+        }
+
+        .header-text {
+            position: relative;
+            top: 1.25vh;
+            left: 5vw;
+        }
+
+        #header-text-left {
+            float: left;
+            left: 5%;
+        }
+
+
+        #map {
+            height: 95vh;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <header>
+        <button class="header-btn"> Back </button>
+        <button class="header-btn-clear"> Clear </button>
+        <div class="header-text" , id="header-text-left"> </div>
+    </header>
+
+    <div id="map"></div>
+
+</body>
+
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
+    <title>Listings</title>
+    <script src="jquery-3.7.0.min.js"></script>
+    <script src="helper_fn.js"></script>
+    <script src="definitions.js"></script>
+    <!-- Images extracted from https://www.flaticon.com/free-icon/travel_5219574  -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <script>
+
+
+        /* Push notification public key */
+        const publicVapidKey = "BNJNAyA2MILwuA1Kd8rrs5plAUnIqVGFhFSxf2qk--nLDbB4Hho4fp-_42kDouaWakN-A5MCoNsnDIBf0_iRUDc";
+        /* Convert public key format to unsigned int 8 */
+        const urlBase64ToUint8Array = (base64String) => {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        };
+
+        $(function () {
+
+            /*******************************
+             * Initialize Service Worker
+             *******************************/
+            if (!('serviceWorker' in navigator)) {
+                console.log("Service Worker not supported.");
+            } else {
+                navigator.serviceWorker.register("service-worker.js")
+                    .then(function () {
+                        console.log("Registered Service Worker.");
+                    })
+                    .catch(function () {
+                        console.log("Failure in Registering Service Worker.");
+                    });
+            }
+
+
+            navigator.serviceWorker.ready.then(function (registration) {
+                registration.pushManager.subscribe(
+                    {
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                    }
+                )
+                    .then(function (subscription) {
+                        console.log(JSON.stringify(subscription));
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            });
+
+            /* Send data to html*/
+            navigator.serviceWorker.addEventListener("message", function (event) {
+                if (checkIfValidPackageName(event.data)) {
+                    console.log('[Note] Saving notification data');
+                    storeNotification(event.data.split(':')[0], event.data.slice(event.data.split(':')[0].length + 1))
+                } else {
+                    console.log('[Warning] Invalid notification input. Data discarded');
+                }
+            });
+
+            /*******************************
+             * DATA EXTRACTION AND DISPLAY
+             *******************************/
+            $.ajax({
+                url: "http://inec.sg/assignment/retrieve_records.php",
+                type: 'GET',
+                success: function (data) {
+                    /* Extract  date info */
+                    dataDate = data[object_key_updateDate].split(' ');
+                    dataDate = dataDate[0] + '  ' + dataDate[1];
+                    /* Check if data is already stored in localStorage */
+                    if (window.localStorage.length != 0) {
+                        /* Check if data requires update */
+                        if (localStorage[object_key_updateDate] == dataDate) {
+                            console.log("[Note] No Date Update Required");
+                        }
+                        /* Data outdated, update data */
+                        else {
+                            localStorage.clear();
+                            console.log("[Warning] Updating localStorage Data");
+                            localStorageUpdateData(dataDate, data[object_key_packages]);
+                        }
+                    }
+                    /* Data not available, create entry */
+                    else {
+                        console.log("[Note] No data found, adding to localStorage");
+                        localStorageUpdateData(dataDate, data[object_key_packages]);
+                    }
+                },
+                error: function (data) {
+                    alert('No Internet Conneciton! Loading data from cache'); //or whatever
+                }
+            });
+
+            /* Display of Time Info */
+            $("#header-text-right").text(localStorage[object_key_updateDate]);
+            /* Display of Package Info */
+            JSON.parse(localStorage[object_key_packages]).forEach(function (element, index) {
+                /* Same div class = displayListItem, id = Item + Index.toString() as identifier */
+                createListing(element, index)
+            });
+
+            /*******************************
+             * ON CLICK HANDLER
+             *******************************/
+            $(".displayList").click(function (evt) {
+                currID = evt.target.id
+                console.log(currID);
+                if (currID != '') {
+                    console.log('entered')
+                    // Save target id into localStorage for subsequent reference
+                    localStorage['listingClickedIndex'] = evt.target.id;
+                    // Change page location upon valid click
+                    window.location.href = "details.html";
+                }
+            })
+
+        });
+
+
+
+        function createListing(element, index) {
+            console.log(element.name);
+            listingHTMLString =
+                " <div class = 'displayListItem' id = '" + index.toString() + "'>" +
+                "<img src='" + element.image + "' class = 'listingImage' id = '" + index.toString() + "' alt='image'>" +
+                "<table>" +
+                "<tr><td id = '" + index.toString() + "'>" + element.name + "</td></tr>" +
+                "<tr><td id = '" + index.toString() + "'> $" + element.price + "</td></tr>" +
+                "</table>" +
+                "</div>";
+
+            $(".displayList").append(listingHTMLString);
+        }
+
+    </script>
+
+    <style>
+        header,
+        body {
+            padding: 0px;
+            margin: 0px;
+        }
+
+        header {
+            height: 5vh;
+            background-color: gray;
+            color: white;
+        }
+
+        .header-text {
+            position: relative;
+            top: 1.25vh;
+        }
+
+        #header-text-left {
+            float: left;
+            left: 2%;
+        }
+
+        #header-text-right {
+            float: right;
+            right: 2%;
+        }
+
+        .displayList {
+            height: 95vh;
+            overflow: auto;
+            background-color: white;
+        }
+
+        .displayListItem {
+            height: 10vh;
+            border: 0.5px solid rgb(114, 114, 114);
+        }
+
+        .listingImage {
+            position: relative;
+            height: 100%;
+            float: left;
+            padding: 0;
+            margin: 0;
+        }
+
+        .displayListItem>table {
+            position: relative;
+            height: 100%;
+            left: 2vw;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-text" , id="header-text-left"> Travel Packages </div>
+        <div class="header-text" , id="header-text-right"> </div>
+    </header>
+
+    <div class="displayList"></div>
+
+</body>
+
+</html>
